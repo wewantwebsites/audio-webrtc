@@ -14,6 +14,16 @@ const links = [
     icon: 'i-heroicons-information-circle',
     to: '/about',
   },
+  {
+    label: 'Call',
+    icon: 'i-heroicons-phone',
+    to: '/call',
+  },
+  {
+    label: 'Nested',
+    icon: 'i-heroicons-queue-list',
+    to: '/nested',
+  },
 ];
 </script>
 
