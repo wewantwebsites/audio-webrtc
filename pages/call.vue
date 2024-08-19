@@ -63,7 +63,7 @@ async function startWebcam() {
   remoteStream.value = new MediaStream();
 
   // push tracks
-  localStream.value.getTracks().forEach(track => {
+  localStream.value.getTracks().forEach((track) => {
     peerConnection.value.addTrack(track, localStream);
   });
 
