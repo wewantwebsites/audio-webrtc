@@ -18,10 +18,10 @@
     <UButton @click="createCall" id="callButton" :disabled="isCallActive">Create Call</UButton>
     <UDivider />
 
-    <!-- <h2>Join Existing Call</h2>
+    <h2>Join Existing Call</h2>
     <UInput v-model="callInput" id="callInput" placeholder="Paste Call ID"></UInput>
-    <UButton id="answerButton" :disabled="!isCallActive">Answer</UButton>
-    <UDivider /> -->
+    <UButton @click="answerCall" id="answerButton" :disabled="isCallActive">Answer</UButton>
+    <UDivider />
 
     <h2>Hang Up</h2>
     <UButton @click="hangup" id="hangUpButton" :disabled="!isCallActive">Hang Up</UButton>
@@ -78,6 +78,7 @@ async function startWebcam() {
 }
 
 async function createCall() {
+  console.group('Creating call');
   const callId = crypto.randomUUID();
 
   channel = socket.channel(`call:${callId}`, { type: 'caller' });
@@ -93,6 +94,94 @@ async function createCall() {
     }, 10000);
     console.log('Sent ICE candidate:\n', event.candidate);
   };
+  const offerDescription = await peerConnection.value.createOffer();
+  await peerConnection.value.setLocalDescription(offerDescription);
+
+  const offer = {
+    sdp: offerDescription.sdp,
+    type: offerDescription.type,
+  };
+
+  channel.push('offer', { offer }, 10000);
+  console.log('Sent offer:\n', offer);
+  console.groupEnd();
+
+  channel.on('answer', ({ answer }) => {
+    console.log('received answer:\n', answer);
+    const answerDescription = new RTCSessionDescription(answer);
+    isCallActive.value = true;
+  })
+  channel.on('ice_candidate', ({ ice_candidate }) => {
+    console.log('Received ICE candidate:\n', ice_candidate);
+    const candidate = new RTCIceCandidate(ice_candidate);
+    peerConnection.value.addIceCandidate(candidate);
+
+  })
+
+}
+
+async function answerCall() {
+  console.group('Answering call');
+  const callId = callInput.value;
+  let callerCandidates;
+
+  // join the channel topic `call:${callId}` on the signalling server
+  // this cahnnel will be used for all signalling messages
+  cahnnel = socket.channel(`call:${callId}`, { type: 'callee' });
+  callerCandidates = await join_channel(channel, callId);
+  console.log(`Got ${callerCandidates.length} ICE candidates from caller on channel join`, callerCandidates);
+
+  const offer = await new Promise((res, rej) => {
+    return channel.push("get_offer", {}, 10000)
+      .receive("ok", (offer) => resolve(offer))
+      .receive("error", (error) => reject(error))
+      .receive("timeout", () => reject("Networking issue..."));
+  })
+
+  console.log('Got offer from caller', offer);
+
+  if (!offer) {
+    cannerl.leave();
+    alert("Could not fetch offer, invalid call id");
+    location.reload();
+  }
+
+  peerConnection.value.onicecandidate = (event) => {
+    if (event.candidate) {
+      channel.push('ice_candidate', {
+        ice_candidate: event.candidate,
+        type: 'callee',
+      }, 10000);
+    }
+  };
+
+  const offerDesc = offer;
+  await peerConnection.value.setRemoteDescription(new RTCSessionDescription(offerDesc));
+
+  const answerDescription = await peerConnection.value.createAnswer();
+
+  await peerConnection.value.setLocalDescription(answerDescription);
+
+  const answer = {
+    sdp: answerDescription.sdp,
+    type: answerDescription.type,
+  };
+
+  channel.push('answer', { answer }, 10000);
+  console.log('Sent answer:\n', answer);
+  console.groupEnd();
+
+  callerCandidates.forEach((candidate) => {
+    console.log('Adding ICE candidate from caller', candidate);
+    const iceCandidate = new RTCIceCandidate(candidate);
+    peerConnection.value.addIceCandidate(iceCandidate);
+  });
+
+  channel.on('ice_candidate', ({ ice_candidate }) => {
+    console.log('Received ICE candidate:\n', ice_candidate);
+    const candidate = new RTCIceCandidate(ice_candidate);
+    peerConnection.value.addIceCandidate(candidate);
+  });
 
   isCallActive.value = true;
 }
