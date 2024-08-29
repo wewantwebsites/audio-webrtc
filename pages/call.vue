@@ -1,30 +1,44 @@
 <template>
   <div>
-    <h2>Start Your Webcam</h2>
-    <section id="videos">
+    <h1 class="w-full lg:text-center">WebRTC Call</h1>
+    <section class="mb-4 flex justify-between lg:justify-around">
+      <h2>Start Your Webcam</h2>
       <div>
-        <h3>You</h3>
-        <video id="localVideo" :srcObject="localStream" autoplay playsinline></video>
-      </div>
-      <div>
-        <h3>Them</h3>
-        <video id="remoteVideo" :srcObject="remoteStream" autoplay playsinline></video>
+        <UButton class="mr-4" @click="startWebcam" :disabled="isWebcamOn">Start Webcam</UButton>
+        <UButton class="mr-4" variant="outline" @click="endWebcam" :disabled="!isWebcamOn">End Webcam</UButton>
+        <UButton color="red" variant="outline" @click="hangup" id="hangUpButton" :disabled="!isCallActive">Hang Up
+        </UButton>
       </div>
     </section>
-    <UButton @click="startWebcam" id="webcamButton" :disabled="isWebcamOn">Start Webcam</UButton>
-    <UDivider />
 
-    <h2>Create New Call</h2>
-    <UButton @click="createCall" id="callButton" :disabled="isCallActive">Create Call</UButton>
-    <UDivider />
+    <section id="videos" class="flex justify-between mb-4 lg:justify-around">
+      <div>
+        <h3>You</h3>
+        <video id="localVideo" :srcObject="localStream" autoplay playsinline class="bg-yellow-500"></video>
+      </div>
+      <UDivider orientation="vertical" class="hidden lg:block" />
+      <div>
+        <h3>Them</h3>
+        <video id="remoteVideo" :srcObject="remoteStream" autoplay playsinline class=""></video>
+      </div>
+    </section>
+    <UDivider class="mb-4" />
+    <section class="mb-4 flex justify-between lg:justify-around">
+      <div class="mb-4">
+        <h2>Create New Call</h2>
+        <UButton @click="createCall" id="callButton" :disabled="isCallActive">Create Call</UButton>
+      </div>
+      <div>
+        <h2>Join Existing Call</h2>
+        <div class="flex">
 
-    <h2>Join Existing Call</h2>
-    <UInput v-model="callInput" id="callInput" placeholder="Paste Call ID"></UInput>
-    <UButton @click="answerCall" id="answerButton" :disabled="isCallActive">Answer</UButton>
-    <UDivider />
+          <UInput class="mr-2" v-model="callInput" id="callInput" placeholder="Paste Call ID"></UInput>
 
-    <h2>Hang Up</h2>
-    <UButton @click="hangup" id="hangUpButton" :disabled="!isCallActive">Hang Up</UButton>
+          <UButton @click="answerCall" id="answerButton" :disabled="isCallActive">Answer</UButton>
+        </div>
+      </div>
+    </section>
+
   </div>
 </template>
 
@@ -52,10 +66,18 @@ onMounted(() => {
 });
 
 function hangup() {
-  location.reload();
+  peerConnection.value.close();
+  isCallActive.value = false;
+  endWebcam();
 }
 
-async function startWebcam() {
+function endWebcam() {
+  localStream.value.getTracks().forEach((track) => track.stop());
+  remoteStream.value.getTracks().forEach((track) => track.stop());
+  isWebcamOn.value = false;
+}
+async function startWebcam(e) {
+  isWebcamOn.value = true;
   localStream.value = await navigator.mediaDevices.getUserMedia({
     video: true,
     audio: true,
@@ -74,7 +96,7 @@ async function startWebcam() {
     });
   };
 
-  isWebcamOn.value = true;
+  isWebcamOn.value = true
 }
 
 async function createCall() {
@@ -127,7 +149,7 @@ async function answerCall() {
 
   // join the channel topic `call:${callId}` on the signalling server
   // this cahnnel will be used for all signalling messages
-  cahnnel = socket.channel(`call:${callId}`, { type: 'callee' });
+  channel = socket.channel(`call:${callId}`, { type: 'callee' });
   callerCandidates = await join_channel(channel, callId);
   console.log(`Got ${callerCandidates.length} ICE candidates from caller on channel join`, callerCandidates);
 
